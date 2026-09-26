@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1f1f23" />
+  <title>剧本工作台</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <button class="icon-btn only-mobile" id="btn-menu" title="场景列表">☰</button>
+    <div class="brand only-desktop">🎬</div>
+    <select class="script-select" id="script-select" title="切换剧本"></select>
+    <div class="spacer"></div>
+    <button class="btn" id="btn-full" title="按顺序预览全部场景">全本</button>
+    <button class="btn" id="btn-log" title="这个剧本的修改记录">历史</button>
+    <button class="btn only-desktop" id="btn-compare" title="左右对比两个场景">对比</button>
+    <button class="btn" id="btn-new" title="新建场景">＋ 场景</button>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="side-section">
+        <div class="side-title">场景</div>
+        <ul class="file-list" id="list-scenes"></ul>
+      </div>
+      <div class="side-section">
+        <div class="side-title">笔记</div>
+        <ul class="file-list" id="list-notes"></ul>
+      </div>
+    </aside>
+    <div class="backdrop" id="backdrop"></div>
+
+    <main class="panes" id="panes"></main>
+  </div>
+
+  <template id="tpl-pane">
+    <section class="pane">
+      <div class="pane-head">
+        <div class="pane-title"></div>
+        <div class="seg">
+          <button data-mode="preview">预览</button>
+          <button data-mode="edit">编辑</button>
+          <button data-mode="split" class="only-wide">分屏</button>
+        </div>
+        <span class="save-state"></span>
+        <button class="icon-btn pane-close only-desktop" title="关闭这一栏">✕</button>
+      </div>
+      <div class="conflict" hidden>
+        <span>这个文件在别处被改过了（可能是 AI 或其他工具改的）</span>
+        <button data-act="theirs">载入新版本</button>
+        <button data-act="mine">保留我的并覆盖</button>
+      </div>
+      <div class="pane-body">
+        <textarea class="editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+        <div class="preview"><div class="page"></div></div>
+      </div>
+    </section>
+  </template>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

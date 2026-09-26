@@ -1,0 +1,22 @@
+{
+  "name": "screenplay-web",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "esbuild node_modules/fountain-js/dist.esm/index.js --bundle --format=esm --outfile=public/fountain.bundle.js",
+    "start": "node server.js",
+    "postinstall": "npm run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "fountain-js": "^1.2.4"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
