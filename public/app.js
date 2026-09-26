@@ -59,7 +59,7 @@ function renderScriptSelect() {
   for (const s of state.scripts) {
     const o = document.createElement('option');
     o.value = s.name;
-    o.textContent = `📖 ${s.name}`;
+    o.textContent = s.name;
     sel.appendChild(o);
   }
   const add = document.createElement('option');

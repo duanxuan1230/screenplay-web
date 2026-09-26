@@ -164,3 +164,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .sheet-actions button.danger { color: #ff7b72; }
 .sheet-actions button.cancel { background: transparent; color: var(--muted); }
 .sheet-actions .quiet { background: transparent; color: #6f6d75; font-size: 12px; padding: 14px 0 2px; margin-top: 10px; border-top: 1px solid var(--line); border-radius: 0; }
+@media (max-width: 800px) {
+  .topbar { gap: 4px; padding: 0 6px; }
+  .topbar .spacer { display: none; }
+  .script-select { flex: 1; max-width: none; }
+  #btn-script-menu { padding: 4px; }
+}
