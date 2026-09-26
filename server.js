@@ -197,8 +197,10 @@ function startWatch() {
         try { version = sha(await fs.readFile(path.join(DATA, rel), 'utf8')); } catch { /* 已删除 */ }
         // 不管是网页还是外部工具改的，都纳入自动提交
         scheduleCommit(script, `${parts[1]}/${parts[2]}`);
+        broadcast({ type: 'changed', script, path: rel, version });
+      } else if (parts.length === 1) {
+        broadcast({ type: 'scripts' });
       }
-      broadcast({ type: 'changed', script, path: rel, version });
     }, 150));
   });
 }
@@ -282,6 +284,59 @@ async function handleApi(req, res, url) {
     }
     await writeAtomic(abs, body.content);
     return send(res, 200, { version: sha(body.content) });
+  }
+
+  // 剧本改名
+  if (url.pathname === '/api/scripts' && req.method === 'PATCH') {
+    const { name, newName } = await readBody(req);
+    const clean = typeof newName === 'string' ? newName.trim() : '';
+    if (!needScript(name)) return;
+    if (!validName(clean)) return send(res, 400, { error: '剧本名不合法（不能含 / \\ : * ? " < > | 或以 . 开头）' });
+    if (clean === name) return send(res, 200, { ok: true, name: clean });
+    if (existsSync(path.join(DATA, clean))) return send(res, 409, { error: '同名剧本已存在' });
+    await flushCommit(name);
+    await fs.rename(path.join(DATA, name), path.join(DATA, clean));
+    await git(['add', '-A', '--', `${name}/`, `${clean}/`]);
+    await git(['commit', '-q', '-m', `[${clean}] 剧本改名：${name} → ${clean}`, '--', `${name}/`, `${clean}/`]);
+    return send(res, 200, { ok: true, name: clean });
+  }
+
+  // 剧本删除：必须回传完整剧本名作为确认；git 历史里仍可找回
+  if (url.pathname === '/api/scripts' && req.method === 'DELETE') {
+    const { name, confirm } = await readBody(req);
+    if (!needScript(name)) return;
+    if (confirm !== name) return send(res, 400, { error: '确认名称不一致' });
+    await flushCommit(name);
+    await fs.rm(path.join(DATA, name), { recursive: true, force: true });
+    await git(['add', '-A', '--', `${name}/`]);
+    await git(['commit', '-q', '-m', `[${name}] 删除剧本`, '--', `${name}/`]);
+    return send(res, 200, { ok: true });
+  }
+
+  // 文件改名（同目录内）
+  if (url.pathname === '/api/rename' && req.method === 'POST') {
+    const body = await readBody(req);
+    const abs = safeRel(body.path);
+    if (!abs) return send(res, 400, { error: '路径不合法' });
+    const ext = path.extname(abs);
+    let base = typeof body.newName === 'string' ? body.newName.trim() : '';
+    if (!EXT.test(base)) base += ext;
+    const [script, dir] = body.path.split('/');
+    const newRel = `${script}/${dir}/${base}`;
+    const newAbs = safeRel(newRel);
+    if (!newAbs) return send(res, 400, { error: '新名字不合法（不能含 / \\ : * ? " < > | 或以 . 开头）' });
+    if (!existsSync(abs)) return send(res, 404, { error: '文件不存在' });
+    if (newAbs === abs) return send(res, 200, { ok: true, path: newRel });
+    if (existsSync(newAbs)) return send(res, 409, { error: '同名文件已存在' });
+    await fs.rename(abs, newAbs);
+    return send(res, 200, { ok: true, path: newRel });
+  }
+
+  if (url.pathname === '/api/file' && req.method === 'DELETE') {
+    const abs = safeRel(q.get('path'));
+    if (!abs) return send(res, 400, { error: '路径不合法' });
+    try { await fs.unlink(abs); } catch { return send(res, 404, { error: '文件不存在' }); }
+    return send(res, 200, { ok: true });
   }
 
   if (url.pathname === '/api/file' && req.method === 'POST') {

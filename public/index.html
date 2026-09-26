@@ -12,6 +12,7 @@
     <button class="icon-btn only-mobile" id="btn-menu" title="场景列表">☰</button>
     <div class="brand only-desktop">🎬</div>
     <select class="script-select" id="script-select" title="切换剧本"></select>
+    <button class="icon-btn" id="btn-script-menu" title="剧本设置">⚙</button>
     <div class="spacer"></div>
     <button class="btn" id="btn-full" title="按顺序预览全部场景">全本</button>
     <button class="btn" id="btn-log" title="这个剧本的修改记录">历史</button>
@@ -33,6 +34,13 @@
     <div class="backdrop" id="backdrop"></div>
 
     <main class="panes" id="panes"></main>
+  </div>
+
+  <div class="sheet-mask" id="sheet" hidden>
+    <div class="sheet">
+      <div class="sheet-title"></div>
+      <div class="sheet-actions"></div>
+    </div>
   </div>
 
   <template id="tpl-pane">

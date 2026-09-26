@@ -119,6 +119,12 @@ function renderList() {
       li.querySelector('.fname').textContent = shortName(f.name);
       li.querySelector('.fhead').textContent = f.heading || '';
       li.onclick = () => { openFile(f.path); closeDrawer(); };
+      const more = document.createElement('button');
+      more.className = 'more';
+      more.textContent = '⋯';
+      more.title = '改名 / 删除';
+      more.onclick = (e) => { e.stopPropagation(); fileMenu(f); };
+      li.appendChild(more);
       ul.appendChild(li);
     }
   }
@@ -382,12 +388,135 @@ async function newScene() {
   openFile(file, { mode: 'edit' });
 }
 
+// ---------- 操作面板 ----------
+function sheet(title, actions) {
+  return new Promise((resolve) => {
+    const mask = $('#sheet');
+    $('.sheet-title', mask).textContent = title;
+    const box = $('.sheet-actions', mask);
+    box.innerHTML = '';
+    const done = (key) => { mask.hidden = true; mask.onclick = null; resolve(key); };
+    for (const a of [...actions, { key: null, label: '取消', cls: 'cancel' }]) {
+      const b = document.createElement('button');
+      b.textContent = a.label;
+      if (a.cls) b.className = a.cls;
+      b.onclick = (e) => { e.stopPropagation(); done(a.key); };
+      box.appendChild(b);
+    }
+    mask.onclick = (e) => { if (e.target === mask) done(null); };
+    mask.hidden = false;
+  });
+}
+
+// ---------- 场景 / 笔记：改名、删除 ----------
+function replacePanePath(oldPath, newPath) {
+  for (const p of state.panes) {
+    if (p.path !== oldPath) continue;
+    if (newPath) {
+      p.path = newPath;
+      p.el.dataset.path = newPath;
+      $('.pane-title', p.el).textContent = shortName(newPath);
+    } else {
+      p.path = null;
+      p.dirty = false;
+      clearTimeout(p.saveTimer);
+      delete p.el.dataset.path;
+      $('.editor', p.el).value = '';
+      $('.page', p.el).innerHTML = '';
+      $('.pane-title', p.el).textContent = '文件已删除';
+      setSaveState(p, '');
+    }
+  }
+  persistLayout();
+}
+
+async function fileMenu(f) {
+  const kind = f.dir === 'scenes' ? '场景' : '笔记';
+  const act = await sheet(shortName(f.name), [
+    { key: 'rename', label: `重命名${kind}` },
+    { key: 'delete', label: `删除${kind}`, cls: 'danger' },
+  ]);
+  if (act === 'rename') {
+    const newName = prompt(`新的${kind}名（保留前面的编号可以维持排序）`, shortName(f.name));
+    if (!newName || !newName.trim() || newName.trim() === shortName(f.name)) return;
+    for (const p of state.panes) if (p.path === f.path && p.dirty) { clearTimeout(p.saveTimer); await save(p); }
+    const r = await api('POST', 'api/rename', { path: f.path, newName: newName.trim() });
+    if (!r.ok) { alert(r.data.error || '改名失败'); return; }
+    replacePanePath(f.path, r.data.path);
+    await refreshList();
+  } else if (act === 'delete') {
+    if (!confirm(`确定删除「${shortName(f.name)}」吗？\n（修改历史里还能找回）`)) return;
+    const r = await api('DELETE', `api/file?path=${enc(f.path)}`);
+    if (!r.ok) { alert(r.data.error || '删除失败'); return; }
+    replacePanePath(f.path, null);
+    await refreshList();
+  }
+}
+
+// ---------- 剧本：改名、删除（删除藏在二级入口 + 输入全名确认） ----------
+async function scriptMenu() {
+  if (!state.script || state.busy) return;
+  state.busy = true;
+  try { await scriptMenuInner(); } finally { setTimeout(() => { state.busy = false; }, 500); }
+}
+async function scriptMenuInner() {
+  const act = await sheet(`📖 ${state.script}`, [
+    { key: 'rename', label: '重命名剧本' },
+    { key: 'danger', label: '删除这个剧本…', cls: 'quiet' },
+  ]);
+  if (act === 'rename') {
+    const newName = prompt('新的剧本名', state.script);
+    if (!newName || !newName.trim() || newName.trim() === state.script) return;
+    for (const p of state.panes) if (p.dirty) { clearTimeout(p.saveTimer); await save(p); }
+    const old = state.script;
+    const r = await api('PATCH', 'api/scripts', { name: old, newName: newName.trim() });
+    if (!r.ok) { alert(r.data.error || '改名失败'); return; }
+    const layout = JSON.parse(localStorage.getItem(`layout:${old}`) || '[]')
+      .map((p) => (p.startsWith(`${old}/`) ? r.data.name + p.slice(old.length) : p));
+    localStorage.setItem(`layout:${r.data.name}`, JSON.stringify(layout));
+    localStorage.removeItem(`layout:${old}`);
+    state.script = null;
+    await refreshScripts();
+    await switchScript(r.data.name);
+  } else if (act === 'danger') {
+    const sure = await sheet(`删除「${state.script}」会移除它的全部场景和笔记`, [
+      { key: 'go', label: '我确定，继续删除', cls: 'danger' },
+    ]);
+    if (sure !== 'go') return;
+    const typed = prompt(`最后一步：请完整输入剧本名「${state.script}」来确认删除`);
+    if (typed !== state.script) { if (typed !== null) alert('名字不一致，已取消'); return; }
+    const name = state.script;
+    state.panes.forEach((p) => { p.dirty = false; clearTimeout(p.saveTimer); });
+    const r = await api('DELETE', 'api/scripts', { name, confirm: typed });
+    if (!r.ok) { alert(r.data.error || '删除失败'); return; }
+    localStorage.removeItem(`layout:${name}`);
+    await onScriptsChanged(true);
+  }
+}
+
+async function onScriptsChanged(force = false) {
+  await refreshScripts();
+  if (state.script && state.scripts.some((s) => s.name === state.script) && !force) return;
+  // 当前剧本不存在了：切到第一个剧本，或显示空状态
+  const next = state.scripts[0]?.name;
+  if (next) { await switchScript(next); return; }
+  state.script = null;
+  state.files = [];
+  state.panes.forEach((p) => p.el.remove());
+  state.panes = [];
+  renderList();
+  renderScriptSelect();
+  addPane();
+  $('.pane-title', state.panes[0].el).textContent = '还没有剧本，点上面的下拉框新建一个';
+}
+
 // ---------- 实时同步 ----------
 let logRefreshTimer = null;
 function listenChanges() {
   const es = new EventSource('api/events');
   es.onmessage = async (e) => {
     const evt = JSON.parse(e.data);
+    if (evt.type === 'scripts') { if (!state.busy) onScriptsChanged(); return; }
     if (evt.type !== 'changed') return;
     if (evt.script !== state.script) { refreshScripts(); return; }
     refreshList();
@@ -418,6 +547,7 @@ $('#btn-new').onclick = newScene;
 $('#btn-compare').onclick = toggleCompare;
 $('#btn-full').onclick = () => openFile(FULL);
 $('#btn-log').onclick = () => openFile(LOG);
+$('#btn-script-menu').onclick = scriptMenu;
 $('#script-select').onchange = (e) => {
   if (e.target.value === '__new__') newScript();
   else switchScript(e.target.value);
