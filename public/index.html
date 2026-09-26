@@ -63,7 +63,32 @@
         <button data-act="mine">保留我的并覆盖</button>
       </div>
       <div class="pane-body">
-        <textarea class="editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+        <div class="editor-wrap">
+          <div class="toolbar" role="toolbar" aria-label="剧本格式">
+            <button data-fmt="scene" title="新场景：场次 时间 内/外 地点">🎬 场景</button>
+            <button data-fmt="action" title="动作、画面描写">📝 动作</button>
+            <button data-fmt="character" title="角色说话：角色名 + 台词">🗣 角色台词</button>
+            <button data-fmt="paren" title="台词里的语气、小动作，放在角色名和台词之间">( ) 语气</button>
+            <button data-fmt="dual" title="和上一句台词同时说，左右并排显示">⇆ 同时说</button>
+            <button data-fmt="transition" title="转场，靠右显示">➡ 转场</button>
+            <button data-fmt="centered" title="居中文字，比如字幕、时间提示">≡ 居中</button>
+            <button data-fmt="lyrics" title="歌词，斜体显示">♪ 歌词</button>
+            <span class="tb-sep"></span>
+            <button data-fmt="bold" title="粗体"><b>B</b></button>
+            <button data-fmt="italic" title="斜体"><i>I</i></button>
+            <button data-fmt="underline" title="下划线"><u>U</u></button>
+            <span class="tb-sep"></span>
+            <button data-fmt="note" title="写给自己的备注，预览里黄色高亮，正式剧本不显示">💬 备注</button>
+            <button data-fmt="section" title="幕/段落标记，只在编辑时看，不出现在预览里">📑 分幕</button>
+            <button data-fmt="synopsis" title="这一段的内容提要，只在编辑时看">✎ 提要</button>
+            <button data-fmt="pagebreak" title="强制分页">✂ 分页</button>
+            <button data-fmt="title" title="在开头加标题页：剧名、作者">📄 标题页</button>
+            <span class="tb-sep"></span>
+            <button data-fmt="help" class="tb-help" title="格式说明">？</button>
+          </div>
+          <div class="cheatsheet" hidden></div>
+          <textarea class="editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+        </div>
         <div class="preview"><div class="page"></div></div>
       </div>
     </section>

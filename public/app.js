@@ -38,7 +38,9 @@ function escapeHtml(s) {
 function renderFountain(text) {
   const out = fountain.parse(text || '');
   const title = out.html.title_page ? `<div class="title-page">${out.html.title_page}</div>` : '';
-  return title + out.html.script;
+  // 备注 [[...]] 默认被渲染成 HTML 注释，这里改成可见的黄色标签（内容已由解析器转义）
+  const script = out.html.script.replace(/<!--([\s\S]*?)-->/g, (_, t) => `<span class="note-inline">💬 ${t.trim()}</span>`);
+  return title + script;
 }
 function renderInto(pageEl, filePath, text) {
   pageEl.classList.remove('history');
@@ -150,6 +152,13 @@ function createPane() {
   el.addEventListener('pointerdown', () => { state.active = state.panes.indexOf(pane); });
   el.querySelectorAll('.seg button').forEach((b) => (b.onclick = () => setMode(pane, b.dataset.mode)));
   $('.pane-close', el).onclick = () => closePane(pane);
+  const toolbar = $('.toolbar', el);
+  // 按下时阻止默认行为，避免输入框失焦、手机键盘收起
+  toolbar.addEventListener('pointerdown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
+  toolbar.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-fmt]');
+    if (b && pane.path && !SPECIAL.has(pane.path)) applyFormat(pane, b.dataset.fmt);
+  });
 
   editor.addEventListener('input', () => {
     pane.dirty = editor.value !== pane.saved;
@@ -387,6 +396,126 @@ async function newScene() {
   if (!r.ok) { alert(r.data.error || '新建失败'); return; }
   await refreshList();
   openFile(file, { mode: 'edit' });
+}
+
+// ---------- 格式工具栏 ----------
+const CHEATSHEET = `<table>
+<tr><td>🎬 场景</td><td><code>.1 夜 内 便利店</code> 以英文句点开头，写场次、时间、内/外景、地点</td></tr>
+<tr><td>📝 动作</td><td>普通的一段话，写画面里发生了什么。上下各空一行</td></tr>
+<tr><td>🗣 角色台词</td><td><code>@小林</code> 角色名以 @ 开头单独一行，下一行紧跟台词，中间不空行</td></tr>
+<tr><td>( ) 语气</td><td><code>(低声)</code> 放在角色名和台词之间，写语气或小动作</td></tr>
+<tr><td>⇆ 同时说</td><td><code>@阿美 ^</code> 角色名后加 ^，和上一句台词左右并排</td></tr>
+<tr><td>➡ 转场</td><td><code>&gt; 切至：</code> 以 &gt; 开头，靠右显示</td></tr>
+<tr><td>≡ 居中</td><td><code>&gt; 三年后 &lt;</code> 两边用 &gt; &lt; 包住</td></tr>
+<tr><td>♪ 歌词</td><td><code>~歌词</code> 以 ~ 开头</td></tr>
+<tr><td>B I U</td><td><code>**粗体**</code> <code>*斜体*</code> <code>_下划线_</code></td></tr>
+<tr><td>💬 备注</td><td><code>[[还要再改]]</code> 写给自己看的，正式剧本不会出现</td></tr>
+<tr><td>📑 分幕 / ✎ 提要</td><td><code># 第一幕</code> <code>= 内容提要</code> 用来整理结构，预览里不显示</td></tr>
+<tr><td>✂ 分页</td><td><code>===</code> 单独一行，强制换页</td></tr>
+<tr><td>📄 标题页</td><td><code>Title: 剧名</code> <code>Author: 作者</code> 放在文件最开头</td></tr>
+</table>
+<p>小技巧：不同段落之间空一行；插入后自动选中的灰字，直接打字就能替换。</p>`;
+
+function sceneCount(text, upto) {
+  return text.slice(0, upto).split('\n').filter((l) => /^\.[^.]/.test(l.trim())).length;
+}
+
+// 在光标处插入文本，尽量走 execCommand 以保留撤销记录
+function insertAt(editor, pos, text) {
+  editor.focus();
+  editor.setSelectionRange(pos, pos);
+  const ok = document.execCommand && document.execCommand('insertText', false, text);
+  if (!ok) {
+    editor.setRangeText(text, pos, pos, 'end');
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+function replaceSelection(editor, start, end, text) {
+  editor.focus();
+  editor.setSelectionRange(start, end);
+  const ok = document.execCommand && document.execCommand('insertText', false, text);
+  if (!ok) {
+    editor.setRangeText(text, start, end, 'end');
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+const lineEnd = (v, p) => { const i = v.indexOf('\n', p); return i < 0 ? v.length : i; };
+const lineStart = (v, p) => v.lastIndexOf('\n', p - 1) + 1;
+
+// 插入独立段落：自动补齐前后空行，并选中占位文字
+function insertBlock(editor, block, placeholder) {
+  const v = editor.value;
+  let pos = editor.selectionStart;
+  if (v.slice(lineStart(v, pos), lineEnd(v, pos)).trim()) pos = lineEnd(v, pos);
+  const before = v.slice(0, pos);
+  const after = v.slice(pos);
+  const prefix = before === '' || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+  const suffix = after.startsWith('\n\n') ? '' : after.startsWith('\n') ? '\n' : after === '' ? '\n' : '\n\n';
+  insertAt(editor, pos, prefix + block + suffix);
+  selectPlaceholder(editor, pos + prefix.length, block, placeholder);
+}
+// 插入紧跟当前行的一行（语气、歌词），不加空行
+function insertLine(editor, line, placeholder) {
+  const v = editor.value;
+  let pos = editor.selectionStart;
+  const cur = v.slice(lineStart(v, pos), lineEnd(v, pos));
+  let text = line;
+  if (cur.trim()) { pos = lineEnd(v, pos); text = '\n' + line; }
+  else pos = lineStart(v, pos);
+  insertAt(editor, pos, text);
+  selectPlaceholder(editor, pos + (text.length - line.length), line, placeholder);
+}
+function selectPlaceholder(editor, base, text, placeholder) {
+  const i = placeholder ? text.indexOf(placeholder) : -1;
+  if (i >= 0) editor.setSelectionRange(base + i, base + i + placeholder.length);
+  else editor.setSelectionRange(base + text.length, base + text.length);
+}
+// 行内包裹：有选中文字就包住，没有就插入占位
+function wrapInline(editor, left, right, placeholder) {
+  const { selectionStart: s, selectionEnd: e, value: v } = editor;
+  const inner = s !== e ? v.slice(s, e) : placeholder;
+  replaceSelection(editor, s, e, left + inner + right);
+  editor.setSelectionRange(s + left.length, s + left.length + inner.length);
+}
+
+function applyFormat(pane, fmt) {
+  const editor = $('.editor', pane.el);
+  const v = editor.value;
+  switch (fmt) {
+    case 'scene': {
+      const n = sceneCount(v, editor.selectionStart) + 1;
+      return insertBlock(editor, `.${n} 日 内 地点`, '日 内 地点');
+    }
+    case 'action': return insertBlock(editor, '画面描写', '画面描写');
+    case 'character': return insertBlock(editor, '@角色名\n台词', '角色名');
+    case 'dual': return insertBlock(editor, '@角色名 ^\n台词', '角色名');
+    case 'paren': return insertLine(editor, '(语气)', '语气');
+    case 'lyrics': return insertLine(editor, '~歌词', '歌词');
+    case 'transition': return insertBlock(editor, '> 切至：', '切至：');
+    case 'centered': return insertBlock(editor, '> 文字 <', '文字');
+    case 'section': return insertBlock(editor, '# 第一幕', '第一幕');
+    case 'synopsis': return insertBlock(editor, '= 这一段讲了什么', '这一段讲了什么');
+    case 'pagebreak': return insertBlock(editor, '===', '');
+    case 'bold': return wrapInline(editor, '**', '**', '粗体');
+    case 'italic': return wrapInline(editor, '*', '*', '斜体');
+    case 'underline': return wrapInline(editor, '_', '_', '下划线');
+    case 'note': return wrapInline(editor, '[[', ']]', '备注');
+    case 'title': {
+      if (/^\s*Title\s*:/i.test(v)) { alert('开头已经有标题页了'); return; }
+      const block = `Title: ${state.script || '剧名'}\nAuthor: 作者\n\n`;
+      insertAt(editor, 0, block);
+      const i = block.indexOf('作者');
+      editor.setSelectionRange(i, i + 2);
+      return;
+    }
+    case 'help': {
+      const sheet = $('.cheatsheet', pane.el);
+      if (!sheet.innerHTML) sheet.innerHTML = CHEATSHEET;
+      sheet.hidden = !sheet.hidden;
+      $('.tb-help', pane.el).classList.toggle('active', !sheet.hidden);
+      return;
+    }
+  }
 }
 
 // ---------- 操作面板 ----------
