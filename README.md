@@ -13,6 +13,7 @@
 - **修改历史**：停止编辑约 1 分钟后自动提交 git，每个剧本单独查看记录和改动
 - **外部修改同步**：文件在别处被修改后，页面自动刷新；编辑冲突时提示选择版本
 - **格式工具栏**：不会 Fountain 语法也能写，点按钮插入场景、台词、转场等格式
+- **Markdown 笔记**：人物小传、大纲等笔记支持标题、列表、表格渲染
 - **自适应布局**：手机上是抽屉式场景列表 + 预览/编辑切换
 
 ## 快速开始
@@ -115,7 +116,7 @@ data/                    独立的 git 仓库，不进本仓库
 
 ## 致谢
 
-排版解析使用 [fountain-js](https://github.com/jonnygreenwald/fountain-js)。
+剧本解析使用 [fountain-js](https://github.com/jonnygreenwald/fountain-js)，笔记渲染使用 [marked](https://github.com/markedjs/marked) 与 [DOMPurify](https://github.com/cure53/DOMPurify)。
 
 ## 许可证
 

@@ -1,4 +1,4 @@
-import { Fountain } from './fountain.bundle.js';
+import { Fountain, marked, DOMPurify } from './vendor.bundle.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const FULL = '__full__';
@@ -45,9 +45,14 @@ function renderFountain(text) {
 function renderInto(pageEl, filePath, text) {
   pageEl.classList.remove('history');
   if (/\.fountain$/i.test(filePath)) {
-    pageEl.classList.remove('markdown');
+    pageEl.classList.remove('markdown', 'md');
     pageEl.innerHTML = renderFountain(text) || '<p style="color:#999">（空白场景，开始写吧）</p>';
+  } else if (/\.md$/i.test(filePath)) {
+    pageEl.classList.remove('markdown');
+    pageEl.classList.add('md');
+    pageEl.innerHTML = DOMPurify.sanitize(marked.parse(text || '', { gfm: true, breaks: true }));
   } else {
+    pageEl.classList.remove('md');
     pageEl.classList.add('markdown');
     pageEl.innerHTML = escapeHtml(text || '');
   }
@@ -257,7 +262,7 @@ async function showFull(pane) {
   const scenes = state.files.filter((f) => f.dir === 'scenes' && /\.fountain$/i.test(f.name));
   const texts = await Promise.all(scenes.map((f) => getFile(f.path).then((r) => (r.ok ? r.data.content : ''))));
   const page = $('.page', pane.el);
-  page.classList.remove('markdown', 'history');
+  page.classList.remove('markdown', 'md', 'history');
   page.innerHTML = scenes.map((f, i) =>
     `<div class="scene-link" data-open="${escapeHtml(f.path)}" title="点击编辑这一场">${renderFountain(texts[i])}</div>`,
   ).join('<hr class="scene-sep" />') || '<p style="color:#999">还没有场景</p>';
@@ -275,7 +280,7 @@ const STATUS = { A: '新增', M: '修改', D: '删除', R: '重命名' };
 async function showLog(pane) {
   $('.pane-title', pane.el).textContent = `${state.script} · 修改历史`;
   const page = $('.page', pane.el);
-  page.classList.remove('markdown');
+  page.classList.remove('markdown', 'md');
   page.classList.add('history');
   page.innerHTML = '<p style="color:#999">加载中…</p>';
   const r = await api('GET', `api/log?script=${enc(state.script)}`);
@@ -498,7 +503,13 @@ function applyFormat(pane, fmt) {
     case 'pagebreak': return insertBlock(editor, '===', '');
     case 'bold': return wrapInline(editor, '**', '**', '粗体');
     case 'italic': return wrapInline(editor, '*', '*', '斜体');
-    case 'underline': return wrapInline(editor, '_', '_', '下划线');
+    case 'underline': return /\.md$/i.test(pane.path) ? wrapInline(editor, '<u>', '</u>', '下划线') : wrapInline(editor, '_', '_', '下划线');
+    case 'md-h': return insertBlock(editor, '## 小标题', '小标题');
+    case 'md-list': return insertLine(editor, '- 要点', '要点');
+    case 'md-olist': return insertLine(editor, '1. 要点', '要点');
+    case 'md-quote': return insertBlock(editor, '> 引用', '引用');
+    case 'md-hr': return insertBlock(editor, '---', '');
+    case 'md-table': return insertBlock(editor, '| 角色 | 年龄 | 性格 |\n| --- | --- | --- |\n| 名字 | 岁数 | 一句话 |', '名字');
     case 'note': return wrapInline(editor, '[[', ']]', '备注');
     case 'title': {
       if (/^\s*Title\s*:/i.test(v)) { alert('开头已经有标题页了'); return; }
