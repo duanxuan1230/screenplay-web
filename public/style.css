@@ -371,15 +371,16 @@ button:focus-visible, select:focus-visible { outline: none; box-shadow: 0 0 0 3p
 }
 @media (min-width: 801px) { .only-mobile { display: none !important; } }
 
-/* ---------- 剧本纸张质感：暖白纸 + 细纹理 + 三孔装订 + 纸堆阴影 ---------- */
+/* ---------- 剧本纸张质感：暖白纸 + 两层噪点纹理 + 纸堆阴影 ---------- */
 :root {
-  --paper-real: #fdfbf4;
+  --paper-real: #fbf8ef;
   --paper-ink: #1f1d1a;
   --paper-ink-soft: #6b6458;
-  --paper-rule: #e6dfcf;
-  --brad: #c9a24a;
-  --brad-dark: #8a6a22;
-  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .38 0 0 0 0 .25 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --paper-rule: #e3dbc8;
+  /* 细颗粒：高频噪点，模拟纸面纤维 */
+  --paper-grain-fine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .2 0 0 0 .16 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* 粗斑驳：低频噪点，模拟纸张厚薄不均 */
+  --paper-grain-coarse: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.018' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .45 0 0 0 0 .28 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 :root[data-theme="dark"] {
   /* 深色模式下纸张像在暗光里：降低亮度，但仍是纸 */
@@ -390,25 +391,14 @@ button:focus-visible, select:focus-visible { outline: none; box-shadow: 0 0 0 3p
 }
 
 .page:not(.md):not(.history):not(.markdown) {
-  --hole: var(--workspace);
-  position: relative;
   color: var(--paper-ink);
   border: none;
   border-radius: 2px;
-  padding-left: 96px;
   background-color: var(--paper-real);
   background-image:
-    /* 顶部、底部孔：黄铜装订钉 */
-    radial-gradient(circle at 34px 96px, var(--brad) 0 5px, var(--brad-dark) 6px 7px, transparent 7.5px),
-    radial-gradient(circle at 34px calc(100% - 96px), var(--brad) 0 5px, var(--brad-dark) 6px 7px, transparent 7.5px),
-    /* 三个打孔 */
-    radial-gradient(circle at 34px 96px, var(--hole) 0 9px, rgba(0,0,0,.12) 9.5px 10.5px, transparent 11px),
-    radial-gradient(circle at 34px 50%, var(--hole) 0 9px, rgba(0,0,0,.12) 9.5px 10.5px, transparent 11px),
-    radial-gradient(circle at 34px calc(100% - 96px), var(--hole) 0 9px, rgba(0,0,0,.12) 9.5px 10.5px, transparent 11px),
-    /* 纸边微微发暗 */
-    radial-gradient(ellipse at center, transparent 62%, rgba(120, 100, 60, .07) 100%),
-    var(--paper-grain);
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat;
+    radial-gradient(ellipse at center, transparent 60%, rgba(120, 100, 60, .08) 100%),
+    var(--paper-grain-fine),
+    var(--paper-grain-coarse);
   box-shadow:
     0 1px 1px rgba(60, 50, 30, .10),
     0 6px 18px rgba(60, 50, 30, .12),
@@ -426,19 +416,9 @@ button:focus-visible, select:focus-visible { outline: none; box-shadow: 0 0 0 3p
 .page:not(.md):not(.history):not(.markdown) hr { border-top-color: var(--paper-rule); }
 .page:not(.md):not(.history):not(.markdown) .scene-link:hover { background: rgba(13, 148, 136, .07); }
 .page:not(.md):not(.history):not(.markdown) .note-inline { background: #fff1a8; color: #7a5b00; }
-.page:not(.md):not(.history):not(.markdown) ::selection { background: rgba(13, 148, 136, .22); }
 
 @media (max-width: 800px) {
   .page:not(.md):not(.history):not(.markdown) {
-    padding-left: 44px; padding-right: 20px;
-    background-image:
-      radial-gradient(circle at 18px 64px, var(--brad) 0 3.5px, var(--brad-dark) 4.5px 5px, transparent 5.5px),
-      radial-gradient(circle at 18px calc(100% - 64px), var(--brad) 0 3.5px, var(--brad-dark) 4.5px 5px, transparent 5.5px),
-      radial-gradient(circle at 18px 64px, var(--hole) 0 6.5px, rgba(0,0,0,.12) 7px 8px, transparent 8.5px),
-      radial-gradient(circle at 18px 50%, var(--hole) 0 6.5px, rgba(0,0,0,.12) 7px 8px, transparent 8.5px),
-      radial-gradient(circle at 18px calc(100% - 64px), var(--hole) 0 6.5px, rgba(0,0,0,.12) 7px 8px, transparent 8.5px),
-      radial-gradient(ellipse at center, transparent 62%, rgba(120, 100, 60, .07) 100%),
-      var(--paper-grain);
     box-shadow: 0 1px 1px rgba(60, 50, 30, .10), 0 4px 12px rgba(60, 50, 30, .12), 3px 3px 0 -1px var(--paper-real), 3px 3px 0 0 rgba(60, 50, 30, .10);
     margin-right: 6px;
   }
