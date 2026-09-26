@@ -102,12 +102,12 @@ function scheduleCommit(script, file) {
 }
 async function flushCommit(script) {
   commitTimers.delete(script);
-  const files = [...(pendingFiles.get(script) || [])];
   pendingFiles.delete(script);
   await git(['add', '-A', '--', `${script}/`]);
-  const status = await git(['diff', '--cached', '--quiet', '--', `${script}/`]);
-  if (!status.err) return; // 没有变化
-  const label = files.length ? files.map((f) => f.split('/').pop().replace(EXT, '')).join('、') : '若干文件';
+  const changed = await git(['diff', '--cached', '--name-only', '--', `${script}/`]);
+  const names = changed.stdout.split('\n').filter(Boolean);
+  if (!names.length) return; // 没有变化
+  const label = names.map((f) => f.split('/').pop().replace(EXT, '')).join('、');
   const r = await git(['commit', '-q', '-m', `[${script}] 修改：${label}`, '--', `${script}/`]);
   if (r.err) console.error('git commit 失败', r.stderr);
 }
