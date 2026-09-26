@@ -27,6 +27,8 @@ const MIME = {
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
 };
 
@@ -406,8 +408,12 @@ async function serveStatic(req, res, url) {
 await ensureDataRepo();
 startWatch();
 
+// 图标和 PWA 清单是公开静态资源：浏览器获取它们时不会带 Basic 认证凭据
+const PUBLIC_ASSETS = /^\/(manifest\.webmanifest|favicon\.svg|icons\/[A-Za-z0-9._-]+\.png)$/;
+
 function authorized(req) {
   if (!AUTH_PASSWORD) return true;
+  if (req.method === 'GET' && PUBLIC_ASSETS.test(new URL(req.url, 'http://localhost').pathname)) return true;
   const m = /^Basic (.+)$/.exec(req.headers.authorization || '');
   if (!m) return false;
   const expected = Buffer.from(`${AUTH_USER}:${AUTH_PASSWORD}`);
