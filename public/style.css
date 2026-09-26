@@ -207,3 +207,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .toolbar { flex-wrap: nowrap; padding: 6px; }   /* 手机上横向滑动 */
   .toolbar button { padding: 6px 10px; font-size: 14px; }
 }
+
+/* 行内强调：中文字体大多没有斜体字形，允许浏览器合成倾斜 */
+.page { font-synthesis: weight style; }
+.page .bold { font-weight: 700; }
+.page .italic { font-style: italic; }
+.page .underline { text-decoration: underline; text-underline-offset: 3px; }
+.page .lyrics { font-style: italic; }
