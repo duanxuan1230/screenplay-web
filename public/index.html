@@ -3,20 +3,36 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#1f1f23" />
-  <title>剧本工作台</title>
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
+  <title>剧本工作台 · screenplay-web</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="剧本工作台" />
+  <script>
+    // 尽早确定主题，避免页面闪白
+    (function () {
+      var t = localStorage.getItem('theme');
+      if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="topbar">
     <button class="icon-btn only-mobile" id="btn-menu" title="场景列表">☰</button>
-    <div class="brand only-desktop">🎬</div>
+    <div class="brand"><img src="favicon.svg" alt="" /><span>剧本工作台</span></div>
     <select class="script-select" id="script-select" title="切换剧本"></select>
     <button class="icon-btn" id="btn-script-menu" title="剧本设置">⚙</button>
     <div class="spacer"></div>
     <button class="btn" id="btn-full" title="按顺序预览全部场景">全本</button>
     <button class="btn only-desktop" id="btn-compare" title="左右对比两个场景">对比</button>
-    <button class="btn" id="btn-new" title="新建场景">＋ 场景</button>
+    <button class="btn primary" id="btn-new" title="新建场景">＋ 场景</button>
+    <button class="icon-btn" id="btn-theme" title="切换浅色 / 深色">☾</button>
   </header>
 
   <div class="layout">

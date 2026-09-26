@@ -689,6 +689,22 @@ $('#btn-compare').onclick = toggleCompare;
 $('#btn-full').onclick = () => openFile(FULL);
 $('#btn-log').onclick = () => { openFile(LOG); closeDrawer(); };
 $('#btn-script-menu').onclick = scriptMenu;
+
+// 主题：手动选择优先，否则跟随系统
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  $('#btn-theme').textContent = t === 'dark' ? '☀' : '☾';
+  $('#btn-theme').title = t === 'dark' ? '切换到浅色' : '切换到深色';
+}
+applyTheme(document.documentElement.dataset.theme || 'light');
+$('#btn-theme').onclick = () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme', next);
+  applyTheme(next);
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+  if (!localStorage.getItem('theme')) applyTheme(e.matches ? 'dark' : 'light');
+});
 $('#script-select').onchange = (e) => {
   if (e.target.value === '__new__') newScript();
   else switchScript(e.target.value);
