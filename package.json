@@ -1,6 +1,6 @@
 {
   "name": "screenplay-web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "基于 Fountain 的网页剧本编辑器：多剧本、实时预览、场景对比、git 修改历史，手机电脑都能用",
   "scripts": {
     "build": "esbuild src/vendor.js --bundle --format=esm --minify --outfile=public/vendor.bundle.js",
