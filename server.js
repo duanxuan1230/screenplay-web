@@ -15,6 +15,10 @@ const DATA = path.resolve(process.env.SCREENPLAY_DATA || path.join(APP_DIR, 'dat
 const PUBLIC = path.join(APP_DIR, 'public');
 const SUBDIRS = ['scenes', 'notes'];
 const EXT = /\.(fountain|md|txt)$/i;
+const AUTH_USER = process.env.SCREENPLAY_USER || 'writer';
+const AUTH_PASSWORD = process.env.SCREENPLAY_PASSWORD || '';
+const EXAMPLES = path.join(APP_DIR, 'examples');
+const LOGLINE_FILE = '00-一句话梗概.md';
 const COMMIT_DELAY_MS = 60_000;
 const MAX_BODY = 5 * 1024 * 1024;
 
@@ -72,7 +76,9 @@ function readBody(req) {
   });
 }
 
+let gitAvailable = true;
 function git(args) {
+  if (!gitAvailable) return Promise.resolve({ err: new Error('git 不可用'), stdout: '', stderr: '' });
   return new Promise((resolve) => {
     execFile('git', [
       '-c', 'user.name=screenplay-web', '-c', 'user.email=screenplay-web@localhost',
@@ -82,11 +88,22 @@ function git(args) {
 }
 
 async function ensureDataRepo() {
+  const firstRun = !existsSync(DATA);
   await fs.mkdir(DATA, { recursive: true });
+  // 首次启动时放一份示例剧本，打开就能看到效果
+  if (firstRun && existsSync(EXAMPLES)) {
+    await fs.cp(EXAMPLES, DATA, { recursive: true });
+  }
+  const probe = await new Promise((resolve) => execFile('git', ['--version'], (err) => resolve(!err)));
+  if (!probe) {
+    gitAvailable = false;
+    console.warn('未检测到 git：编辑功能正常，但不会记录修改历史');
+    return;
+  }
   if (!existsSync(path.join(DATA, '.git'))) {
     await git(['init', '-q']);
     await fs.writeFile(path.join(DATA, '.gitignore'), '.*.tmp\n', 'utf8');
-    await git(['add', '.gitignore']);
+    await git(['add', '-A']);
     await git(['commit', '-q', '-m', '初始化剧本数据仓库']);
   }
 }
@@ -233,8 +250,8 @@ async function handleApi(req, res, url) {
     if (existsSync(dir)) return send(res, 409, { error: '同名剧本已存在' });
     await fs.mkdir(path.join(dir, 'scenes'), { recursive: true });
     await fs.mkdir(path.join(dir, 'notes'), { recursive: true });
-    await fs.writeFile(path.join(dir, 'notes', '00-logline.md'),
-      '# Logline\n\n（一句话：谁，想要什么，被什么阻挡）\n', 'utf8');
+    await fs.writeFile(path.join(dir, 'notes', LOGLINE_FILE),
+      '# 一句话梗概（Logline）\n\n（一句话：谁，想要什么，被什么阻挡）\n', 'utf8');
     await fs.writeFile(path.join(dir, 'scenes', '001-开场.fountain'),
       `Title: ${clean}\nAuthor: \n\n.1 日 内 地点\n\n`, 'utf8');
     await git(['add', '-A', '--', `${clean}/`]);
@@ -249,7 +266,7 @@ async function handleApi(req, res, url) {
 
   if (url.pathname === '/api/log' && req.method === 'GET') {
     if (!needScript(q.get('script'))) return;
-    return send(res, 200, { commits: await gitLog(q.get('script')) });
+    return send(res, 200, { gitAvailable, commits: await gitLog(q.get('script')) });
   }
 
   if (url.pathname === '/api/diff' && req.method === 'GET') {
@@ -389,8 +406,21 @@ async function serveStatic(req, res, url) {
 await ensureDataRepo();
 startWatch();
 
+function authorized(req) {
+  if (!AUTH_PASSWORD) return true;
+  const m = /^Basic (.+)$/.exec(req.headers.authorization || '');
+  if (!m) return false;
+  const expected = Buffer.from(`${AUTH_USER}:${AUTH_PASSWORD}`);
+  const given = Buffer.from(Buffer.from(m[1], 'base64').toString('utf8'));
+  return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  if (!authorized(req)) {
+    res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="screenplay-web", charset="UTF-8"' });
+    return res.end('需要登录');
+  }
   try {
     if (url.pathname.startsWith('/api/')) await handleApi(req, res, url);
     else if (req.method === 'GET') await serveStatic(req, res, url);
@@ -408,4 +438,12 @@ async function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-server.listen(PORT, HOST, () => console.log(`剧本工作台：http://${HOST}:${PORT}  数据目录 ${DATA}`));
+server.listen(PORT, HOST, () => {
+  console.log(`剧本工作台：http://${HOST}:${PORT}  数据目录 ${DATA}`);
+  if (!AUTH_PASSWORD) {
+    const exposed = !['127.0.0.1', 'localhost', '::1'].includes(HOST);
+    console.warn(exposed
+      ? '⚠️ 正在监听非本机地址且未设置 SCREENPLAY_PASSWORD，任何人都能读写你的剧本！'
+      : '未设置 SCREENPLAY_PASSWORD：仅本机可访问，如需远程访问请设置密码或放在带认证的反向代理后面');
+  }
+});

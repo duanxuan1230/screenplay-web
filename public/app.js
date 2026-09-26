@@ -271,6 +271,7 @@ async function showLog(pane) {
   page.innerHTML = '<p style="color:#999">加载中…</p>';
   const r = await api('GET', `api/log?script=${enc(state.script)}`);
   if (!r.ok) { page.innerHTML = `<p>加载失败：${escapeHtml(r.data.error || r.status)}</p>`; return; }
+  if (r.data.gitAvailable === false) { page.innerHTML = '<p style="color:#999">服务器没有安装 git，暂时无法记录修改历史</p>'; setSaveState(pane, ''); return; }
   const commits = r.data.commits;
   setSaveState(pane, `${commits.length} 次提交`);
   page.innerHTML = commits.map((c) => `
@@ -546,7 +547,7 @@ $('#backdrop').onclick = closeDrawer;
 $('#btn-new').onclick = newScene;
 $('#btn-compare').onclick = toggleCompare;
 $('#btn-full').onclick = () => openFile(FULL);
-$('#btn-log').onclick = () => openFile(LOG);
+$('#btn-log').onclick = () => { openFile(LOG); closeDrawer(); };
 $('#btn-script-menu').onclick = scriptMenu;
 $('#script-select').onchange = (e) => {
   if (e.target.value === '__new__') newScript();

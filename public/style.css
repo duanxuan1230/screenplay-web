@@ -31,7 +31,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* 布局 */
 .layout { display: flex; height: calc(100% - var(--topbar-h)); }
-.sidebar { width: 260px; flex-shrink: 0; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); padding: 8px 0; }
+.sidebar { width: 260px; flex-shrink: 0; overflow-y: auto; display: flex; flex-direction: column; background: var(--panel); border-right: 1px solid var(--line); padding: 8px 0; }
 .side-title { font-size: 12px; color: var(--muted); padding: 10px 14px 4px; letter-spacing: 1px; }
 .file-list { list-style: none; margin: 0; padding: 0; }
 .file-list li { padding: 7px 14px; cursor: pointer; border-left: 3px solid transparent; }
@@ -170,3 +170,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .script-select { flex: 1; max-width: none; }
   #btn-script-menu { padding: 4px; }
 }
+
+.side-footer { margin-top: auto; padding: 10px 8px; border-top: 1px solid var(--line); }
+.side-link { width: 100%; text-align: left; background: transparent; border: none; color: var(--muted); padding: 8px 8px; border-radius: 6px; font-size: 13px; }
+.side-link:hover { background: #33333a; color: var(--text); }
+.side-link.active { color: var(--accent); }

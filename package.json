@@ -1,22 +1,26 @@
 {
   "name": "screenplay-web",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "0.1.0",
+  "description": "基于 Fountain 的网页剧本编辑器：多剧本、实时预览、场景对比、git 修改历史，手机电脑都能用",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "build": "esbuild node_modules/fountain-js/dist.esm/index.js --bundle --format=esm --outfile=public/fountain.bundle.js",
     "start": "node server.js",
     "postinstall": "npm run build"
   },
-  "keywords": [],
+  "keywords": [
+    "screenplay",
+    "fountain",
+    "screenwriting",
+    "editor"
+  ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
+    "esbuild": "^0.28.2",
     "fountain-js": "^1.2.4"
   },
-  "devDependencies": {
-    "esbuild": "^0.28.2"
+  "engines": {
+    "node": ">=20"
   }
 }
