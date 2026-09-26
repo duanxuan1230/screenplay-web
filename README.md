@@ -19,7 +19,7 @@
 需要 Node.js 20+。git 可选，没有 git 时只是不记录历史。
 
 ```bash
-git clone <仓库地址> screenplay-web
+git clone https://github.com/duanxuan1230/screenplay-web.git
 cd screenplay-web
 npm ci
 npm start
