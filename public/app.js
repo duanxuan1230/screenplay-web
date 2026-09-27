@@ -484,7 +484,8 @@ async function exportPdf(target) {
 }
 
 function downloadText(filename, text) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+  // 开头加 UTF-8 BOM：本地文件没有编码信息，浏览器和部分编辑器（如 Windows 记事本）会按 GBK 等猜测，中文变乱码
+  const url = URL.createObjectURL(new Blob(['\uFEFF', text.replace(/^\uFEFF/, '')], { type: 'text/plain;charset=utf-8' }));
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
