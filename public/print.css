@@ -1,0 +1,109 @@
+/* ============================================================
+   导出 / 打印样式：在新窗口中排版，交给浏览器「另存为 PDF」
+   剧本排版参考通用剧本格式：A4、左侧装订留白、页码在右上角
+   ============================================================ */
+
+@page {
+  size: A4;
+  margin: 25mm 22mm 22mm 35mm;
+  @top-right {
+    content: counter(page) ".";
+    font-family: "Courier Prime", "Courier New", "Noto Serif CJK SC", "Songti SC", serif;
+    font-size: 10pt;
+    color: #333;
+  }
+}
+/* 第一页（标题页或第一页正文）不显示页码 */
+@page :first {
+  @top-right { content: none; }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  color: #111;
+  background: #e5e7eb;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ---------- 屏幕上的预览外观 ---------- */
+.print-bar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px; background: #0f172a; color: #e2e8f0;
+  font: 14px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+}
+.print-bar button {
+  height: 34px; padding: 0 14px; border: none; border-radius: 6px;
+  background: #0d9488; color: #fff; font: inherit; font-weight: 600; cursor: pointer;
+}
+.print-bar button:hover { background: #0f766e; }
+.print-bar span { color: #94a3b8; font-size: 13px; }
+main {
+  width: 210mm; min-height: 297mm; margin: 20px auto 40px; background: #fff;
+  padding: 25mm 22mm 22mm 35mm; box-shadow: 0 4px 20px rgba(0, 0, 0, .15);
+}
+
+@media print {
+  body { background: #fff; }
+  .print-bar { display: none; }
+  main { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+}
+
+/* ---------- 剧本 ---------- */
+body.fountain main {
+  font-family: "Courier Prime", "Courier New", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", "STSong", serif;
+  font-size: 12pt; line-height: 1.55;
+  font-synthesis: weight style;
+}
+body.fountain .title-page {
+  min-height: 230mm; display: flex; flex-direction: column; justify-content: center; align-items: center;
+  text-align: center; break-after: page; page-break-after: always;
+}
+body.fountain .title-page h1 { font-size: 20pt; letter-spacing: 2pt; margin: 0 0 18pt; }
+body.fountain .title-page p { margin: 3pt 0; }
+body.fountain h3 {
+  font-size: 12pt; font-weight: 700; text-transform: uppercase;
+  margin: 18pt 0 10pt; break-after: avoid; page-break-after: avoid;
+}
+body.fountain main > h3:first-child, body.fountain .title-page + h3 { margin-top: 0; }
+body.fountain p { margin: 0 0 11pt; white-space: pre-wrap; orphans: 2; widows: 2; }
+body.fountain .dialogue {
+  margin: 0 0 11pt 22%; width: 56%;
+  break-inside: avoid; page-break-inside: avoid;
+}
+body.fountain .dialogue h4 { margin: 0; padding-left: 26%; font-size: 12pt; font-weight: 400; text-transform: uppercase; }
+body.fountain .dialogue p { margin: 0; }
+body.fountain .dialogue p.parenthetical { padding-left: 12%; padding-right: 12%; }
+body.fountain .dual-dialogue { display: flex; gap: 6%; margin: 0 0 11pt; break-inside: avoid; }
+body.fountain .dual-dialogue .dialogue { margin: 0; width: 47%; }
+body.fountain .dual-dialogue .dialogue h4 { padding-left: 20%; }
+body.fountain h2 { text-align: right; font-size: 12pt; font-weight: 400; text-transform: uppercase; margin: 11pt 0; }
+body.fountain .centered { text-align: center; }
+body.fountain .bold { font-weight: 700; }
+body.fountain .italic, body.fountain .lyrics { font-style: italic; }
+body.fountain .underline { text-decoration: underline; }
+body.fountain hr { border: none; margin: 0; break-after: page; page-break-after: always; }
+
+/* ---------- 笔记 ---------- */
+body.md main {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  font-size: 11pt; line-height: 1.75;
+}
+body.md h1, body.md h2, body.md h3, body.md h4 { line-height: 1.35; margin: 1.3em 0 .5em; break-after: avoid; }
+body.md h1 { font-size: 20pt; margin-top: 0; }
+body.md h2 { font-size: 15pt; padding-bottom: 4pt; border-bottom: 1px solid #ddd; }
+body.md h3 { font-size: 13pt; }
+body.md p { margin: 0 0 .8em; }
+body.md ul, body.md ol { padding-left: 1.6em; margin: 0 0 .8em; }
+body.md blockquote { margin: 0 0 1em; padding: .3em 1em; border-left: 3px solid #0d9488; color: #444; background: #f0fdfa; }
+body.md code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; font-size: 10pt; }
+body.md pre { background: #f1f5f9; padding: 10px 12px; border-radius: 4px; white-space: pre-wrap; }
+body.md table { border-collapse: collapse; width: 100%; margin: 0 0 1em; font-size: 10pt; break-inside: auto; }
+body.md tr { break-inside: avoid; }
+body.md th, body.md td { border: 1px solid #cbd5e1; padding: 5pt 8pt; text-align: left; vertical-align: top; }
+body.md th { background: #f1f5f9; }
+body.md hr { border: none; border-top: 1px solid #ddd; margin: 1.5em 0; }
+body.md img { max-width: 100%; }
+body.md a { color: #0f766e; }

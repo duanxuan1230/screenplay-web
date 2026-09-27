@@ -429,3 +429,7 @@ button:focus-visible, select:focus-visible { outline: none; box-shadow: 0 0 0 3p
     margin-right: 6px;
   }
 }
+
+/* 导出按钮：没打开文件或在历史页时隐藏 */
+.pane-export { height: 30px; padding: 0 10px; flex-shrink: 0; }
+.pane:not([data-path]) .pane-export, .pane[data-path="__log__"] .pane-export { display: none; }

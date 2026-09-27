@@ -157,6 +157,7 @@ function createPane() {
   el.addEventListener('pointerdown', () => { state.active = state.panes.indexOf(pane); });
   el.querySelectorAll('.seg button').forEach((b) => (b.onclick = () => setMode(pane, b.dataset.mode)));
   $('.pane-close', el).onclick = () => closePane(pane);
+  $('.pane-export', el).onclick = () => exportMenu(pane);
   const toolbar = $('.toolbar', el);
   // 按下时阻止默认行为，避免输入框失焦、手机键盘收起
   toolbar.addEventListener('pointerdown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
@@ -401,6 +402,131 @@ async function newScene() {
   if (!r.ok) { alert(r.data.error || '新建失败'); return; }
   await refreshList();
   openFile(file, { mode: 'edit' });
+}
+
+// ---------- 导出 ----------
+// PDF 走浏览器自带的「打印 → 另存为 PDF」：中文字体、排版都由浏览器处理，不需要额外依赖
+async function flushPending() {
+  for (const p of state.panes) if (p.dirty) { clearTimeout(p.saveTimer); await save(p); }
+}
+
+function fountainForPrint(text) {
+  // 导出时备注 [[...]] 保持为 HTML 注释，不出现在正式剧本里
+  const out = fountain.parse(text || '');
+  return { title: out.html.title_page, script: out.html.script };
+}
+
+function printDocument(win, { title, kind, body }) {
+  const css = new URL('print.css', location.href).href;
+  win.document.open();
+  win.document.write(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)}</title><link rel="stylesheet" href="${css}"></head>
+<body class="${kind}">
+<div class="print-bar"><button onclick="window.print()">另存为 PDF</button>
+<span>在打印窗口里把「目标打印机」选成「另存为 PDF」，文件名默认是「${escapeHtml(title)}」</span></div>
+<main>${body}</main>
+<script>
+  window.addEventListener('load', function () {
+    (document.fonts ? document.fonts.ready : Promise.resolve()).then(function () { setTimeout(function () { window.print(); }, 300); });
+  });
+<\/script></body></html>`);
+  win.document.close();
+}
+
+async function exportPdf(target) {
+  // 必须在用户点击的同一时刻打开窗口，否则会被浏览器当成弹窗拦截
+  const win = window.open('', '_blank');
+  if (!win) { alert('浏览器拦截了新窗口，请允许本站弹出窗口后再试'); return; }
+  win.document.write('<p style="font-family:sans-serif;padding:24px;color:#64748b">正在准备导出…</p>');
+  await flushPending();
+  try {
+    if (target.full) {
+      const scenes = state.files.filter((f) => f.dir === 'scenes' && /\.fountain$/i.test(f.name));
+      const texts = await Promise.all(scenes.map((f) => getFile(f.path).then((r) => (r.ok ? r.data.content : ''))));
+      let titlePage = '';
+      const parts = texts.map((t) => {
+        const { title, script } = fountainForPrint(t);
+        if (title && !titlePage) titlePage = title;
+        return script;
+      });
+      if (!titlePage) titlePage = `<h1>${escapeHtml(state.script)}</h1>`;
+      printDocument(win, {
+        title: `${state.script}`,
+        kind: 'fountain',
+        body: `<div class="title-page">${titlePage}</div>${parts.join('')}`,
+      });
+      return;
+    }
+    const r = await getFile(target.path);
+    if (!r.ok) throw new Error(r.data.error || '读取失败');
+    const name = shortName(target.path);
+    if (/\.fountain$/i.test(target.path)) {
+      const { title, script } = fountainForPrint(r.data.content);
+      printDocument(win, {
+        title: `${state.script}-${name}`,
+        kind: 'fountain',
+        body: (title ? `<div class="title-page">${title}</div>` : '') + script,
+      });
+    } else if (/\.md$/i.test(target.path)) {
+      printDocument(win, {
+        title: `${state.script}-${name}`,
+        kind: 'md',
+        body: DOMPurify.sanitize(marked.parse(r.data.content, { gfm: true, breaks: true })),
+      });
+    } else {
+      printDocument(win, { title: `${state.script}-${name}`, kind: 'md', body: `<pre>${escapeHtml(r.data.content)}</pre>` });
+    }
+  } catch (e) {
+    win.close();
+    alert(`导出失败：${e.message}`);
+  }
+}
+
+function downloadText(filename, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function downloadSource(target) {
+  await flushPending();
+  if (target.full) {
+    const scenes = state.files.filter((f) => f.dir === 'scenes' && /\.fountain$/i.test(f.name));
+    const texts = await Promise.all(scenes.map((f) => getFile(f.path).then((r) => (r.ok ? r.data.content.trim() : ''))));
+    downloadText(`${state.script}.fountain`, texts.filter(Boolean).join('\n\n') + '\n');
+    return;
+  }
+  const r = await getFile(target.path);
+  if (!r.ok) { alert(r.data.error || '读取失败'); return; }
+  downloadText(`${state.script}-${target.path.split('/').pop()}`, r.data.content);
+}
+
+async function exportMenu(pane) {
+  if (!pane.path || pane.path === LOG) return;
+  const isFull = pane.path === FULL;
+  const kind = isFull ? '' : pane.path.includes('/scenes/') ? '这一场' : '这篇笔记';
+  const ext = isFull ? '' : pane.path.split('.').pop();
+  const actions = isFull
+    ? [
+        { key: 'full-pdf', label: '📄 导出全本 PDF' },
+        { key: 'full-src', label: '⬇ 下载全本 .fountain' },
+      ]
+    : [
+        { key: 'pdf', label: `📄 导出${kind} PDF` },
+        { key: 'full-pdf', label: '📚 导出全本 PDF' },
+        { key: 'src', label: `⬇ 下载原文件 .${ext}` },
+      ];
+  const act = await sheet('导出', actions);
+  if (act === 'pdf') exportPdf({ path: pane.path });
+  else if (act === 'full-pdf') exportPdf({ full: true });
+  else if (act === 'src') downloadSource({ path: pane.path });
+  else if (act === 'full-src') downloadSource({ full: true });
 }
 
 // ---------- 新建笔记 ----------
@@ -661,10 +787,13 @@ function replacePanePath(oldPath, newPath) {
 async function fileMenu(f) {
   const kind = f.dir === 'scenes' ? '场景' : '笔记';
   const act = await sheet(shortName(f.name), [
+    { key: 'export', label: '导出 PDF' },
     { key: 'rename', label: `重命名${kind}` },
     { key: 'delete', label: `删除${kind}`, cls: 'danger' },
   ]);
-  if (act === 'rename') {
+  if (act === 'export') {
+    exportPdf({ path: f.path });
+  } else if (act === 'rename') {
     const newName = prompt(`新的${kind}名（保留前面的编号可以维持排序）`, shortName(f.name));
     if (!newName || !newName.trim() || newName.trim() === shortName(f.name)) return;
     for (const p of state.panes) if (p.path === f.path && p.dirty) { clearTimeout(p.saveTimer); await save(p); }
