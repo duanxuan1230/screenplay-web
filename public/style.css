@@ -131,7 +131,13 @@ button:focus-visible, select:focus-visible { outline: none; box-shadow: 0 0 0 3p
   width: 264px; flex-shrink: 0; overflow-y: auto; display: flex; flex-direction: column;
   background: var(--sidebar); border-right: 1px solid var(--border); padding: 10px 8px;
 }
-.side-title { font-size: 12px; font-weight: 600; color: var(--muted-foreground); padding: 12px 10px 6px; letter-spacing: .5px; }
+.side-title { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--muted-foreground); padding: 10px 6px 6px 10px; letter-spacing: .5px; }
+.side-add {
+  width: 24px; height: 24px; display: grid; place-items: center; padding: 0;
+  background: transparent; border: none; border-radius: var(--radius-sm);
+  color: var(--muted-foreground); font-size: 15px; line-height: 1; transition: background .15s, color .15s;
+}
+.side-add:hover { background: var(--accent); color: var(--primary); }
 .file-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .file-list li {
   position: relative; padding: 8px 38px 8px 12px; border-radius: var(--radius-sm);

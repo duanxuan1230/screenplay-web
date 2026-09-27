@@ -403,6 +403,93 @@ async function newScene() {
   openFile(file, { mode: 'edit' });
 }
 
+// ---------- 新建笔记 ----------
+const NOTE_TEMPLATES = {
+  blank: (name) => `# ${name}\n\n`,
+  character: (name) => `# ${name}
+
+## 基本信息
+| 项目 | 内容 |
+| --- | --- |
+| 姓名 |  |
+| 年龄 |  |
+| 职业 |  |
+| 一句话形容 |  |
+
+## 想要什么（外在目标）
+他/她在故事里主动追求的东西。
+
+## 真正需要什么（内在需求）
+他/她自己可能都没意识到、但必须得到或领悟的东西。
+
+## 缺陷与伤痕
+过去发生过什么，让他/她变成现在这样。
+
+## 人物弧光
+- 开场时：
+- 转折点：
+- 结尾时：
+
+## 人物关系
+- 
+
+## 标志性细节
+口头禅、小动作、随身物品……
+`,
+  outline: (name) => `# ${name}
+
+| 场次 | 时间 / 地点 | 发生了什么 | 作用（铺垫 / 转折 / 呼应） |
+| --- | --- | --- | --- |
+| 1 |  |  |  |
+| 2 |  |  |  |
+| 3 |  |  |  |
+
+## 伏笔清单
+- [ ] 伏笔：　　　→ 回收于第　场
+`,
+  world: (name) => `# ${name}
+
+## 时代与地点
+故事发生在什么时候、什么地方。
+
+## 核心设定
+和现实世界最不一样的一点是什么。
+
+## 规则与代价
+这个设定怎么运作？使用它要付出什么代价？
+
+## 势力与组织
+- 
+
+## 日常细节
+普通人在这个世界里怎么生活。
+`,
+};
+
+async function newNote() {
+  if (!state.script) return;
+  const kind = await sheet('新建笔记', [
+    { key: 'blank', label: '📝 空白笔记' },
+    { key: 'character', label: '👤 人物小传' },
+    { key: 'outline', label: '🗂 分场大纲' },
+    { key: 'world', label: '🌍 世界观设定' },
+  ]);
+  if (!kind) return;
+  const defaults = { blank: '', character: '人物小传-', outline: '分场大纲', world: '世界观设定' };
+  const name = prompt('笔记名', defaults[kind]);
+  if (!name || !name.trim()) return;
+  const clean = name.trim().replace(/[\\/:*?"<>|\x00-\x1f]/g, '').replace(/^\.+/, '');
+  if (!clean) return;
+  const nums = state.files.filter((f) => f.dir === 'notes').map((f) => parseInt(f.name, 10)).filter((n) => !isNaN(n));
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  const file = `${state.script}/notes/${String(next).padStart(2, '0')}-${clean}.md`;
+  const r = await api('POST', 'api/file', { path: file, content: NOTE_TEMPLATES[kind](clean) });
+  if (!r.ok) { alert(r.data.error || '新建失败'); return; }
+  await refreshList();
+  closeDrawer();
+  openFile(file, { mode: isMobile() ? 'edit' : undefined });
+}
+
 // ---------- 格式工具栏 ----------
 const CHEATSHEET = `<table>
 <tr><td>🎬 场景</td><td><code>.1 夜 内 便利店</code> 以英文句点开头，写场次、时间、内/外景、地点</td></tr>
@@ -685,6 +772,8 @@ function listenChanges() {
 $('#btn-menu').onclick = () => document.body.classList.toggle('drawer-open');
 $('#backdrop').onclick = closeDrawer;
 $('#btn-new').onclick = newScene;
+$('#btn-add-scene').onclick = () => { closeDrawer(); newScene(); };
+$('#btn-add-note').onclick = newNote;
 $('#btn-compare').onclick = toggleCompare;
 $('#btn-full').onclick = () => openFile(FULL);
 $('#btn-log').onclick = () => { openFile(LOG); closeDrawer(); };
