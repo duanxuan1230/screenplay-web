@@ -596,12 +596,14 @@ const NOTE_TEMPLATES = {
 async function newNote() {
   if (!state.script) return;
   const kind = await sheet('新建笔记', [
+    { key: 'upload', label: '📤 上传 txt 文件' },
     { key: 'blank', label: '📝 空白笔记' },
     { key: 'character', label: '👤 人物小传' },
     { key: 'outline', label: '🗂 分场大纲' },
     { key: 'world', label: '🌍 世界观设定' },
   ]);
   if (!kind) return;
+  if (kind === 'upload') { $('#note-upload').click(); return; }
   const defaults = { blank: '', character: '人物小传-', outline: '分场大纲', world: '世界观设定' };
   const name = prompt('笔记名', defaults[kind]);
   if (!name || !name.trim()) return;
@@ -616,6 +618,46 @@ async function newNote() {
   closeDrawer();
   openFile(file, { mode: isMobile() ? 'edit' : undefined });
 }
+
+// ---------- 上传 txt 笔记 ----------
+const UPLOAD_MAX_BYTES = 2 * 1024 * 1024;
+
+// 手机记事本导出的 txt 可能是 UTF-8，也可能是 GBK（GB18030 兼容 GBK）：先严格按 UTF-8 解，失败再退回 GB18030
+function decodeText(buf) {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buf);
+  } catch {
+    return new TextDecoder('gb18030').decode(buf);
+  }
+}
+
+async function uploadNotes(files) {
+  if (!state.script || !files.length) return;
+  const nums = state.files.filter((f) => f.dir === 'notes').map((f) => parseInt(f.name, 10)).filter((n) => !isNaN(n));
+  let next = (nums.length ? Math.max(...nums) : 0) + 1;
+  const done = [];
+  const failed = [];
+  for (const f of files) {
+    if (!/\.txt$/i.test(f.name)) { failed.push(`${f.name}：只支持 .txt`); continue; }
+    if (f.size > UPLOAD_MAX_BYTES) { failed.push(`${f.name}：超过 2MB`); continue; }
+    const text = decodeText(await f.arrayBuffer()).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+    const clean = f.name.replace(/\.txt$/i, '').trim()
+      .replace(/[\\/:*?"<>|\x00-\x1f]/g, '').replace(/^\.+/, '').replace(/^\d+-/, '') || '草稿';
+    const file = `${state.script}/notes/${String(next).padStart(2, '0')}-${clean}.txt`;
+    const r = await api('POST', 'api/file', { path: file, content: text });
+    if (r.ok) { done.push(file); next++; } else failed.push(`${f.name}：${r.data.error || '上传失败'}`);
+  }
+  await refreshList();
+  closeDrawer();
+  if (done.length) openFile(done[done.length - 1]);
+  if (failed.length) alert(`上传成功 ${done.length} 个，失败 ${failed.length} 个：\n${failed.join('\n')}`);
+}
+
+$('#note-upload').onchange = async (e) => {
+  const files = [...e.target.files];
+  e.target.value = '';
+  await uploadNotes(files);
+};
 
 // ---------- 格式工具栏 ----------
 const CHEATSHEET = `<table>
@@ -901,7 +943,6 @@ function listenChanges() {
 // ---------- 启动 ----------
 $('#btn-menu').onclick = () => document.body.classList.toggle('drawer-open');
 $('#backdrop').onclick = closeDrawer;
-$('#btn-new').onclick = newScene;
 $('#btn-add-scene').onclick = () => { closeDrawer(); newScene(); };
 $('#btn-add-note').onclick = newNote;
 $('#btn-compare').onclick = toggleCompare;
