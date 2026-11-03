@@ -627,20 +627,36 @@ function decodeText(buf) {
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(buf);
   } catch {
-    return new TextDecoder('gb18030').decode(buf);
+    try {
+      return new TextDecoder('gb18030').decode(buf);
+    } catch {
+      return new TextDecoder('utf-8').decode(buf);
+    }
   }
 }
 
+// 部分手机浏览器内核较老，没有 Blob.arrayBuffer()，退回 FileReader
+function readFileBuffer(f) {
+  if (typeof f.arrayBuffer === 'function') return f.arrayBuffer();
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = () => reject(fr.error || new Error('读取文件失败'));
+    fr.readAsArrayBuffer(f);
+  });
+}
+
 async function uploadNotes(files) {
-  if (!state.script || !files.length) return;
   const nums = state.files.filter((f) => f.dir === 'notes').map((f) => parseInt(f.name, 10)).filter((n) => !isNaN(n));
   let next = (nums.length ? Math.max(...nums) : 0) + 1;
   const done = [];
   const failed = [];
   for (const f of files) {
-    if (!/\.txt$/i.test(f.name)) { failed.push(`${f.name}：只支持 .txt`); continue; }
+    // 有些手机文件选择器给的文件名不带后缀，这时按 MIME 判断
+    const isTxt = /\.txt$/i.test(f.name) || (!/\.[^./]+$/.test(f.name) && (!f.type || f.type === 'text/plain'));
+    if (!isTxt) { failed.push(`${f.name}：只支持 .txt`); continue; }
     if (f.size > UPLOAD_MAX_BYTES) { failed.push(`${f.name}：超过 2MB`); continue; }
-    const text = decodeText(await f.arrayBuffer()).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+    const text = decodeText(await readFileBuffer(f)).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
     const clean = f.name.replace(/\.txt$/i, '').trim()
       .replace(/[\\/:*?"<>|\x00-\x1f]/g, '').replace(/^\.+/, '').replace(/^\d+-/, '') || '草稿';
     const file = `${state.script}/notes/${String(next).padStart(2, '0')}-${clean}.txt`;
@@ -653,11 +669,18 @@ async function uploadNotes(files) {
   if (failed.length) alert(`上传成功 ${done.length} 个，失败 ${failed.length} 个：\n${failed.join('\n')}`);
 }
 
-$('#note-upload').onchange = async (e) => {
-  const files = [...e.target.files];
+async function onNoteUploadPicked(e) {
+  const files = Array.from(e.target.files || []);
   e.target.value = '';
-  await uploadNotes(files);
-};
+  if (!files.length) { alert('没有读到选中的文件，换个文件管理器或浏览器再试试'); return; }
+  if (!state.script) { alert('请先选择一个剧本'); return; }
+  try {
+    await uploadNotes(files);
+  } catch (err) {
+    alert(`上传出错：${(err && err.message) || err}`);
+  }
+}
+$('#note-upload').addEventListener('change', onNoteUploadPicked);
 
 // ---------- 格式工具栏 ----------
 const CHEATSHEET = `<table>
