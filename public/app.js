@@ -646,7 +646,7 @@ function readFileBuffer(f) {
   });
 }
 
-async function uploadNotes(files) {
+async function uploadNotes(files, bufs) {
   const nums = state.files.filter((f) => f.dir === 'notes').map((f) => parseInt(f.name, 10)).filter((n) => !isNaN(n));
   let next = (nums.length ? Math.max(...nums) : 0) + 1;
   const done = [];
@@ -656,7 +656,8 @@ async function uploadNotes(files) {
     const isTxt = /\.txt$/i.test(f.name) || (!/\.[^./]+$/.test(f.name) && (!f.type || f.type === 'text/plain'));
     if (!isTxt) { failed.push(`${f.name}：只支持 .txt`); continue; }
     if (f.size > UPLOAD_MAX_BYTES) { failed.push(`${f.name}：超过 2MB`); continue; }
-    const text = decodeText(await readFileBuffer(f)).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+    if (bufs.get(f) instanceof Error) { failed.push(`${f.name}：读取失败（${bufs.get(f).message}）`); continue; }
+    const text = decodeText(bufs.get(f)).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
     const clean = f.name.replace(/\.txt$/i, '').trim()
       .replace(/[\\/:*?"<>|\x00-\x1f]/g, '').replace(/^\.+/, '').replace(/^\d+-/, '') || '草稿';
     const file = `${state.script}/notes/${String(next).padStart(2, '0')}-${clean}.txt`;
@@ -670,12 +671,19 @@ async function uploadNotes(files) {
 }
 
 async function onNoteUploadPicked(e) {
-  const files = Array.from(e.target.files || []);
-  e.target.value = '';
+  const input = e.target;
+  const files = Array.from(input.files || []);
   if (!files.length) { alert('没有读到选中的文件，换个文件管理器或浏览器再试试'); return; }
-  if (!state.script) { alert('请先选择一个剧本'); return; }
+  if (!state.script) { input.value = ''; alert('请先选择一个剧本'); return; }
+  // 必须先把内容读进内存，再清空 input：安卓上清空 input 会收回对所选文件的读取授权，
+  // 之后再读会报 NotReadableError（"could not be read, typically due to permission problems"）
+  const bufs = new Map();
+  await Promise.all(files.filter((f) => f.size <= UPLOAD_MAX_BYTES).map(async (f) => {
+    try { bufs.set(f, await readFileBuffer(f)); } catch (err) { bufs.set(f, err instanceof Error ? err : new Error(String(err))); }
+  }));
+  input.value = '';
   try {
-    await uploadNotes(files);
+    await uploadNotes(files, bufs);
   } catch (err) {
     alert(`上传出错：${(err && err.message) || err}`);
   }
